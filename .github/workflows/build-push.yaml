@@ -11,6 +11,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  AUTO_VERSION: v0.0.${{ github.run_number }}
 
 jobs:
   build:
@@ -44,6 +45,7 @@ jobs:
           tags: |
             type=sha,prefix=
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ env.AUTO_VERSION }},enable={{is_default_branch}}
             type=ref,event=tag
 
       - name: Build and push
