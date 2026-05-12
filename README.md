@@ -19,6 +19,21 @@ docker run --rm -p 3000:3000 \
   todo-backend:local
 ```
 
+## CI Image
+
+GitHub Actions workflow:
+
+```text
+.github/workflows/build-push.yaml
+```
+
+On push to `main`, it builds and pushes:
+
+```text
+ghcr.io/<owner>/<repo>:<git-sha>
+ghcr.io/<owner>/<repo>:latest
+```
+
 ## API
 
 ```text
