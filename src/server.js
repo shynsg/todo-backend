@@ -1,5 +1,6 @@
 import cors from "cors";
 import express from "express";
+import pino from "pino";
 import { redis, getRedisStatus } from "./cache.js";
 import { pool } from "./db.js";
 
@@ -7,17 +8,21 @@ const app = express();
 const port = Number(process.env.PORT || 3000);
 const serviceBaseUrl = process.env.SERVICE_BASE_URL || `http://127.0.0.1:${port}`;
 const notificationServiceUrl = process.env.NOTIFICATION_SERVICE_URL || "http://notification:3001";
+const logger = pino({
+  base: {
+    service: "todo-backend"
+  }
+});
 
 app.use(cors());
 app.use(express.json());
 
 function logEvent(event, fields = {}) {
-  console.log(JSON.stringify({
+  logger.info({
     event,
-    service: "todo-backend",
     timestamp: new Date().toISOString(),
     ...fields
-  }));
+  });
 }
 
 function sleep(ms) {
@@ -209,5 +214,7 @@ app.use((error, req, res, next) => {
 });
 
 app.listen(port, "0.0.0.0", () => {
-  console.log(`Todo backend listening on port ${port}`);
+  logEvent("service_started", {
+    port
+  });
 });
