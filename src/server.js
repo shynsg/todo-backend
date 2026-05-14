@@ -49,6 +49,8 @@ app.get("/api/health", async (req, res) => {
 
   res.json({
     status: "ok",
+    service: "todo-backend",
+    version: process.env.DD_VERSION || "local",
     redis: redisStatus
   });
 });
