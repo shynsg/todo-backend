@@ -3,6 +3,7 @@ import express from "express";
 import pino from "pino";
 import { redis, getRedisStatus } from "./cache.js";
 import { pool } from "./db.js";
+import { publishTodoCreated } from "./events.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -81,6 +82,16 @@ app.post("/api/todos", async (req, res) => {
 
   if (redis) {
     await redis.del("todos:count").catch(() => {});
+  }
+
+  try {
+    const publishResult = await publishTodoCreated(result.rows[0]);
+    logEvent("todo_created_event_published", publishResult);
+  } catch (error) {
+    logEvent("todo_created_event_publish_failed", {
+      todoId: result.rows[0].id,
+      error: error.message
+    });
   }
 
   return res.status(201).json({

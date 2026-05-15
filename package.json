@@ -8,6 +8,7 @@
     "start": "node src/server.js"
   },
   "dependencies": {
+    "amqplib": "0.10.9",
     "cors": "2.8.5",
     "express": "5.2.1",
     "ioredis": "5.4.1",
