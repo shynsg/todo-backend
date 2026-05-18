@@ -3,6 +3,13 @@ import express from "express";
 import pino from "pino";
 import { redis, getRedisStatus } from "./cache.js";
 import { pool } from "./db.js";
+import {
+  appendTodoEvent,
+  createEventSourcedTodo,
+  getEventSourcedTodo,
+  getTodoEvents,
+  listEventSourcedTodos
+} from "./eventStore.js";
 import { publishTodoCreated } from "./events.js";
 
 const app = express();
@@ -146,6 +153,135 @@ app.get("/api/stats", async (req, res) => {
   res.json({
     total
   });
+});
+
+app.get("/api/event-sourcing/todos", async (req, res, next) => {
+  try {
+    const todos = await listEventSourcedTodos();
+
+    res.json({
+      todos
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/event-sourcing/todos", async (req, res, next) => {
+  const title = String(req.body?.title || "").trim();
+
+  if (!title) {
+    return res.status(400).json({
+      error: "title is required"
+    });
+  }
+
+  try {
+    const result = await createEventSourcedTodo(title);
+
+    logEvent("event_sourced_todo_created", {
+      aggregateId: result.todo.id,
+      eventVersion: result.event.event_version
+    });
+
+    res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/event-sourcing/todos/:id", async (req, res, next) => {
+  try {
+    const result = await getEventSourcedTodo(req.params.id);
+
+    if (!result.todo) {
+      return res.status(404).json({
+        error: "todo not found"
+      });
+    }
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/event-sourcing/todos/:id/events", async (req, res, next) => {
+  try {
+    const events = await getTodoEvents(req.params.id);
+
+    res.json({
+      events
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/event-sourcing/todos/:id/complete", async (req, res, next) => {
+  try {
+    const current = await getEventSourcedTodo(req.params.id);
+
+    if (!current.todo) {
+      return res.status(404).json({
+        error: "todo not found"
+      });
+    }
+
+    const event = await appendTodoEvent({
+      aggregateId: req.params.id,
+      eventType: "TodoCompleted",
+      payload: {
+        completed: true
+      }
+    });
+    const updated = await getEventSourcedTodo(req.params.id);
+
+    logEvent("event_sourced_todo_completed", {
+      aggregateId: req.params.id,
+      eventVersion: event.event_version
+    });
+
+    res.json({
+      event,
+      todo: updated.todo
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/event-sourcing/todos/:id/reopen", async (req, res, next) => {
+  try {
+    const current = await getEventSourcedTodo(req.params.id);
+
+    if (!current.todo) {
+      return res.status(404).json({
+        error: "todo not found"
+      });
+    }
+
+    const event = await appendTodoEvent({
+      aggregateId: req.params.id,
+      eventType: "TodoReopened",
+      payload: {
+        completed: false
+      }
+    });
+    const updated = await getEventSourcedTodo(req.params.id);
+
+    logEvent("event_sourced_todo_reopened", {
+      aggregateId: req.params.id,
+      eventVersion: event.event_version
+    });
+
+    res.json({
+      event,
+      todo: updated.todo
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.post("/api/trace-demo", async (req, res, next) => {

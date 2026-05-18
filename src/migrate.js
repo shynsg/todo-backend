@@ -30,6 +30,24 @@ async function migrate() {
   `);
 
   await pool.query(`
+    create table if not exists todo_event_store (
+      id bigserial primary key,
+      aggregate_id text not null,
+      aggregate_type text not null,
+      event_type text not null,
+      event_version integer not null,
+      payload jsonb not null,
+      created_at timestamptz not null default now(),
+      unique (aggregate_id, event_version)
+    );
+  `);
+
+  await pool.query(`
+    create index if not exists todo_event_store_aggregate_idx
+    on todo_event_store (aggregate_id, event_version);
+  `);
+
+  await pool.query(`
     insert into todos (title)
     select 'Ship the Kubernetes capstone'
     where not exists (
