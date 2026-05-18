@@ -78,3 +78,34 @@ export async function publishTodoCreated(todo) {
     routingKey: "todo.created"
   };
 }
+
+export async function publishIntegrationEvent({ eventId, eventType, routingKey, payload }) {
+  const channel = await getChannel();
+
+  if (!channel) {
+    return {
+      published: false,
+      reason: "rabbitmq_disabled"
+    };
+  }
+
+  const published = channel.publish(
+    exchangeName,
+    routingKey,
+    Buffer.from(JSON.stringify(payload)),
+    {
+      contentType: "application/json",
+      deliveryMode: 2,
+      messageId: eventId,
+      timestamp: Math.floor(Date.now() / 1000),
+      type: eventType
+    }
+  );
+
+  return {
+    published,
+    eventId,
+    exchange: exchangeName,
+    routingKey
+  };
+}

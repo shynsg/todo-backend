@@ -4,6 +4,10 @@ import pino from "pino";
 import { redis, getRedisStatus } from "./cache.js";
 import { pool } from "./db.js";
 import {
+  listOutboxEvents,
+  publishClaimedOutboxEvents
+} from "./outbox.js";
+import {
   appendTodoEvent,
   createEventSourcedTodo,
   getEventSourcedTodo,
@@ -161,6 +165,34 @@ app.get("/api/event-sourcing/todos", async (req, res, next) => {
 
     res.json({
       todos
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/outbox/events", async (req, res, next) => {
+  try {
+    const limit = Math.min(Number(req.query.limit || 50), 100);
+    const events = await listOutboxEvents(limit);
+
+    res.json({
+      events
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/outbox/publish-once", async (req, res, next) => {
+  try {
+    const publishedOrAttempted = await publishClaimedOutboxEvents({
+      logEvent,
+      batchSize: Number(req.body?.batchSize || 10)
+    });
+
+    res.json({
+      publishedOrAttempted
     });
   } catch (error) {
     next(error);

@@ -4,6 +4,37 @@ function createAggregateId() {
   return `todo-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function toIntegrationEvent({ event, payload }) {
+  const integrationEventTypeByDomainEvent = {
+    TodoCreated: "todo.created",
+    TodoCompleted: "todo.completed",
+    TodoReopened: "todo.reopened"
+  };
+  const eventType = integrationEventTypeByDomainEvent[event.event_type];
+
+  if (!eventType) {
+    throw new Error(`No integration event mapping for ${event.event_type}`);
+  }
+
+  return {
+    eventId: `${event.aggregate_id}-${event.event_version}`,
+    aggregateId: event.aggregate_id,
+    eventType,
+    routingKey: eventType,
+    payload: {
+      eventId: `${event.aggregate_id}-${event.event_version}`,
+      eventType,
+      version: event.event_version,
+      occurredAt: event.created_at,
+      source: "todo-backend",
+      data: {
+        todoId: event.aggregate_id,
+        ...payload
+      }
+    }
+  };
+}
+
 export function replayTodo(events) {
   let todo = null;
 
@@ -62,9 +93,33 @@ export async function appendTodoEvent({ aggregateId, eventType, payload }) {
        returning id, aggregate_id, aggregate_type, event_type, event_version, payload, created_at`,
       [aggregateId, eventType, nextVersion, payload]
     );
+    const event = insertResult.rows[0];
+    const integrationEvent = toIntegrationEvent({
+      event,
+      payload
+    });
+
+    await client.query(
+      `insert into outbox_events (
+         event_id,
+         aggregate_id,
+         event_type,
+         routing_key,
+         payload
+       )
+       values ($1, $2, $3, $4, $5)
+       on conflict (event_id) do nothing`,
+      [
+        integrationEvent.eventId,
+        integrationEvent.aggregateId,
+        integrationEvent.eventType,
+        integrationEvent.routingKey,
+        integrationEvent.payload
+      ]
+    );
 
     await client.query("commit");
-    return insertResult.rows[0];
+    return event;
   } catch (error) {
     await client.query("rollback");
     throw error;

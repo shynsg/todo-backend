@@ -48,6 +48,27 @@ async function migrate() {
   `);
 
   await pool.query(`
+    create table if not exists outbox_events (
+      id bigserial primary key,
+      event_id text not null unique,
+      aggregate_id text not null,
+      event_type text not null,
+      routing_key text not null,
+      payload jsonb not null,
+      attempts integer not null default 0,
+      locked_at timestamptz,
+      published_at timestamptz,
+      last_error text,
+      created_at timestamptz not null default now()
+    );
+  `);
+
+  await pool.query(`
+    create index if not exists outbox_events_unpublished_idx
+    on outbox_events (published_at, locked_at, created_at);
+  `);
+
+  await pool.query(`
     insert into todos (title)
     select 'Ship the Kubernetes capstone'
     where not exists (

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "migrate": "node src/migrate.js",
+    "outbox:worker": "node src/outboxWorker.js",
     "start": "node src/server.js"
   },
   "dependencies": {
